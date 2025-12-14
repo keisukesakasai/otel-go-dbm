@@ -1,0 +1,36 @@
+init_config:
+
+instances:
+  # CloudSQL DBM設定
+  # 注意: 本番環境では、このファイルに直接パスワードを記述せず、
+  # 環境変数やシークレット管理システムを使用してください
+  - dbm: true
+    host: <your-database-host>  # データベースホストを設定してください
+    port: 5432
+    username: datadog
+    # パスワードを設定してください（暗号化推奨）
+    # 暗号化する場合: ./scripts/encrypt-password.sh 'your-password' を実行してENC[...]形式を使用
+    # 簡易版: 直接パスワードを指定（セキュリティ上推奨されません）
+    password: <your-datadog-db-password>  # Datadog用データベースパスワードを設定してください
+    dbname: testdb
+    ssl: require
+    # CloudSQLインスタンス名をホスト名として使用
+    reported_hostname: sakasa-otel-go-dbm
+    # クエリメトリクスとクエリサンプルを収集
+    query_metrics:
+      enabled: true
+    query_samples:
+      enabled: true
+    # リレーションメトリクスを収集
+    relations:
+      - relation_regex: .*
+    # スキーマ情報を収集
+    collect_schemas:
+      enabled: true
+    # アクティビティを収集
+    collect_activity:
+      enabled: true
+    # データベースサイズを収集
+    collect_database_size_metrics: true
+    # デフォルトのデータベースに接続
+    dbstrict: false

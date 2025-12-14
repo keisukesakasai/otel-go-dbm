@@ -1,0 +1,97 @@
+
+services:
+  # ローカル開発用PostgreSQL（CloudSQL使用時は不要）
+  postgres:
+    image: postgres:15-alpine
+    container_name: otel-go-dbm-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - local-db  # ローカルDBを使用する場合のみ起動
+
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: otel-go-dbm-datadog-agent
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=datadoghq.com
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_APM_FEATURES=enable_operation_and_resource_name_logic_v2
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      # プロセスエージェントを有効化（OTLPコレクターに必要）
+      - DD_PROCESS_AGENT_ENABLED=true
+      # プロセスコレクションを有効化
+      - DD_PROCESS_CONFIG_PROCESS_COLLECTION_ENABLED=true
+      - DD_PROCESS_CONFIG_ENABLED=true
+      # OTLP設定（Docker環境では環境変数を使用）
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
+      # OTLP取り込みパイプラインの既知の問題の回避策（Agent 7.61.0以降）
+      - HOST_PROC=/proc
+    # ポートは内部ネットワーク経由でアクセス可能なため公開不要
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # /proc/:/host/proc/:ro を削除（OTLP取り込みパイプラインの既知の問題の回避策）
+      # - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      # Datadog設定ファイルをマウント
+      - ./datadog/conf.d:/etc/datadog-agent/conf.d:ro
+    pid: host  # OTLP取り込みパイプラインの既知の問題の回避策
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: otel-go-dbm-app
+    labels:
+      com.datadoghq.ad.logs: '[{"source": "go", "service": "otel-go-dbm"}]'
+    environment:
+      # CloudSQL接続設定（環境変数で上書き可能）
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-advent-user}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-testdb}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      SKIP_MIGRATION: ${SKIP_MIGRATION:-false}
+      PORT: "8080"
+      # OpenTelemetry設定
+      OTEL_EXPORTER_OTLP_ENDPOINT: datadog-agent:4318
+      OTEL_SERVICE_NAME: otel-go-dbm
+      OTEL_RESOURCE_ATTRIBUTES: service.name=otel-go-dbm,service.version=1.0.0,deployment.environment=advent,telemetry.sdk.language=go
+    ports:
+      - "8081:8080"
+    depends_on:
+      - datadog-agent
+    restart: unless-stopped
+
+  k6-normal:
+    image: grafana/k6:latest
+    container_name: otel-go-dbm-k6-normal
+    volumes:
+      - ./k6:/scripts
+    command: run /scripts/scenario-normal.js
+    depends_on:
+      - app
+    environment:
+      - BASE_URL=http://app:8080
+    profiles:
+      - loadtest
+
+
+volumes:
+  postgres_data:
