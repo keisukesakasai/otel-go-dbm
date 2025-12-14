@@ -29,7 +29,7 @@ services:
       - DD_APM_ENABLED=true
       - DD_APM_NON_LOCAL_TRAFFIC=true
       - DD_APM_FEATURES=enable_operation_and_resource_name_logic_v2
-      - DD_LOGS_ENABLED=true
+      - DD_LOGS_ENABLED=false
       - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
       # プロセスエージェントを有効化（OTLPコレクターに必要）
       - DD_PROCESS_AGENT_ENABLED=true
@@ -41,6 +41,10 @@ services:
       - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
       # OTLP取り込みパイプラインの既知の問題の回避策（Agent 7.61.0以降）
       - HOST_PROC=/proc
+      # Database Monitoring設定
+      - DD_DATABASE_MONITORING_ENABLED=true
+      # PostgreSQL接続情報（環境変数から取得、または直接指定）
+      - DD_POSTGRES_PASSWORD=${DB_PASSWORD}
     # ポートは内部ネットワーク経由でアクセス可能なため公開不要
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -72,26 +76,13 @@ services:
       # OpenTelemetry設定
       OTEL_EXPORTER_OTLP_ENDPOINT: datadog-agent:4318
       OTEL_SERVICE_NAME: otel-go-dbm
+      # 統合サービスタグ付け: service.name, deployment.environment, service.version
       OTEL_RESOURCE_ATTRIBUTES: service.name=otel-go-dbm,service.version=1.0.0,deployment.environment=advent,telemetry.sdk.language=go
     ports:
       - "8081:8080"
     depends_on:
       - datadog-agent
     restart: unless-stopped
-
-  k6-normal:
-    image: grafana/k6:latest
-    container_name: otel-go-dbm-k6-normal
-    volumes:
-      - ./k6:/scripts
-    command: run /scripts/scenario-normal.js
-    depends_on:
-      - app
-    environment:
-      - BASE_URL=http://app:8080
-    profiles:
-      - loadtest
-
 
 volumes:
   postgres_data:

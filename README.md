@@ -1,10 +1,10 @@
 # OpenTelemetry Go DBM Sample Application
 
-アドベントカレンダー用のサンプルアプリケーションです。Go + GORM + PostgreSQL + OpenTelemetry + Datadog DBM を使用したWebアプリケーションです。
+アドベントカレンダー用のサンプルアプリケーションです。Go + database/sql + PostgreSQL + OpenTelemetry + Datadog DBM を使用したWebアプリケーションです。
 
 ## 構成
 
-- **Goアプリケーション**: GORMを使用したDB操作を含むWebサーバー（参考サンプルアプリと同じ構造）
+- **Goアプリケーション**: `database/sql`と`otelsql`を使用したDB操作を含むWebサーバー（参考サンプルアプリと同じ構造）
 - **PostgreSQL**: CloudSQL互換のPostgreSQLデータベース
 - **k6**: ロードテストツール
 - **Datadog Agent**: OpenTelemetryトレースとDBMの収集
@@ -21,12 +21,22 @@
 - `GET /api/v1/analytics/category`: カテゴリ別の売上分析（GROUP BY、HAVING句）
 - `GET /api/v1/orders/details?order_id=<id>`: 注文詳細取得（3テーブルJOIN）
 
+### [FEATURE_VERIFICATION] 機能検証用エンドポイント
+
+機能検証用に`database/sql`を直接使用するエンドポイント（検証後削除予定）：
+
+- `GET /api/v1/test/analytics/user-orders`: ユーザー別の注文統計（直接実装版）
+- `GET /api/v1/test/analytics/product-sales`: 商品別の売上統計（直接実装版）
+- `GET /api/v1/test/analytics/category`: カテゴリ別の売上分析（直接実装版）
+- `GET /api/v1/test/orders/details?order_id=<id>`: 注文詳細取得（直接実装版）
+
 ### 主な機能
 
 - OpenTelemetryによるトレーシング
-- GORMプラグインによる自動DB計装
+- `otelsql`による自動DB計装
 - Datadog Database Monitoring (DBM) との相関
 - 複雑なクエリによる実行計画の可視化
+- SQLコメントによるCalling Services表示（機能検証用）
 - 参考サンプルアプリと同じ構造（handler構造体、メソッドレシーバー）
 
 ## セットアップ
